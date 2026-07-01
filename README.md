@@ -77,7 +77,22 @@ The code assumes the following pinmapping:
 
 5. Add to Home Assistant:
 
-   The device should automatically appear in Home Assistant's ESPHome integration after it connects to your network.
+   The device should automatically appear in Home Assistant's ESPHome integration after it connects to your network. Two cover entities will be automatically added to Home Assistant.
+
+   ![Home Assistant covers](pics/ha-covers.jpeg)
+
+6. Customize Cover Configuration:
+
+   The `novo-bridge.yaml` file includes two pre-configured cover entities as examples:
+
+   - Blind Channel 1, Uses Remote 1, Channel 1
+   - Blind Channel 2, Uses Remote 1, Channel 2
+
+   Recommendation: Customize these covers to match your setup by editing the YAML file:
+   - Update the remote and channel assignments based on your pairing
+   - Change the cover names to match your room/blind names (e.g., "Living Room Blind", "Bedroom Skylight")
+   - Add or remove cover entities as needed for your number of blinds
+   - Adjust the direction if needed (note the `// reversed direction` comments if your blinds operate opposite to expected)
 
 ## Configuration
 
@@ -120,7 +135,7 @@ This project includes a complete reverse-engineering analysis of the Novo D33100
 - Timing analysis
 - Python reference implementation
 
-The [arduino/](Arduino folder) contains a sketch that I used to validate the protocol before doing the ESPHome.
+The [arduino](arduino/) folder contains a sketch that I used to validate the protocol before doing the ESPHome implementation.
 
 ## Contributing
 
