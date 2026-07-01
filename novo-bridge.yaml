@@ -1,0 +1,202 @@
+esphome:
+  name: novo-bridge
+  friendly_name: "Bridge"
+  includes:
+    - cc1101_radio.h
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          cc1101_configure_novo();
+          ESP_LOGI("novo_boot", "%s", cc1101_probe_string().c_str());
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 15min
+
+web_server:
+  port: 80
+
+switch:
+  - platform: gpio
+    id: status_led
+    name: "Status LED"
+    pin: GPIO19
+    restore_mode: ALWAYS_OFF
+
+binary_sensor:
+  - platform: gpio
+    id: boot_button
+    name: "Boot Button"
+    pin:
+      number: GPIO9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+select:
+  - platform: template
+    name: "Remote"
+    id: novo_remote_select
+    optimistic: true
+    initial_option: "Remote 1"
+    options:
+      - "Remote 1"
+      - "Remote 2"
+      - "Remote 3"
+    set_action:
+      - lambda: |-
+          if (x == "Remote 1") {
+            novo_set_remote(0);
+          } else if (x == "Remote 2") {
+            novo_set_remote(1);
+          } else if (x == "Remote 3") {
+            novo_set_remote(2);
+          }
+
+  - platform: template
+    name: "Channel"
+    id: novo_channel_select
+    optimistic: true
+    initial_option: "1"
+    options:
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+    set_action:
+      - lambda: |-
+          if (x == "1") novo_set_channel_number(1);
+          else if (x == "2") novo_set_channel_number(2);
+          else if (x == "3") novo_set_channel_number(3);
+          else if (x == "4") novo_set_channel_number(4);
+          else if (x == "5") novo_set_channel_number(5);
+          else if (x == "6") novo_set_channel_number(6);
+
+cover:
+  - platform: template
+    name: "Blind Channel 1"
+    id: novo_blind_channel_1
+    optimistic: true
+    assumed_state: true
+
+    open_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(1);  // Channel 1
+          novo_close();                // reversed direction
+
+    close_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(1);  // Channel 1
+          novo_open();                 // reversed direction
+
+    stop_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(1);  // Channel 1
+          novo_stop();
+
+  - platform: template
+    name: "Blind Channel 2"
+    id: novo_blind_channel_2
+    optimistic: true
+    assumed_state: true
+
+    open_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(2);  // Channel 2
+          novo_close();                // reversed direction
+
+    close_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(2);  // Channel 2
+          novo_open();                 // reversed direction
+
+    stop_action:
+      - lambda: |-
+          novo_set_remote(0);          // Remote 1
+          novo_set_channel_number(2);  // Channel 2
+          novo_stop();
+
+button:
+  - platform: restart
+    name: "Restart"
+
+  - platform: template
+    name: "Open"
+    on_press:
+      - lambda: |-
+          novo_open();
+
+  - platform: template
+    name: "Stop"
+    on_press:
+      - lambda: |-
+          novo_stop();
+
+  - platform: template
+    name: "Close"
+    on_press:
+      - lambda: |-
+          novo_close();
+
+  - platform: template
+    name: "Pair"
+    on_press:
+      - lambda: |-
+          novo_pair();
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 30s
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 30s
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "Connected SSID"
+    mac_address:
+      name: "MAC Address"
+
+  - platform: template
+    name: "CC1101 Probe Result"
+    update_interval: 10s
+    lambda: |-
+      return cc1101_probe_string();
+
+  - platform: template
+    name: "Status"
+    update_interval: 5s
+    lambda: |-
+      return novo_status_string();
