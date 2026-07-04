@@ -709,4 +709,9 @@ The following is not 100% understood:
 I'd love to receive more samples to determine more device id and phase_id relationship. How to make a usefull capture:
 
 1. Start `rtl_sdr -f 868000000 -g 20 -s 1000000 recording-1Ms.cu8`
-2. Tell me your SDR's sample rate and center frequency, and which remote/channel it is.
+2. Open the `cu8` file in URH and select `Show data as Hex` and and share the hex stream.
+
+    A succesfull capture should look like this in URH: ![URH decode as hex](pics/urh.jpg)
+
+    It has the 0x2f50 preamble which means this is a broadcast of frame A.
+

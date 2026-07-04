@@ -79,7 +79,7 @@ The code assumes the following pinmapping:
 
    The device should automatically appear in Home Assistant's ESPHome integration after it connects to your network. Two cover entities will be automatically added to Home Assistant.
 
-   ![Home Assistant covers](pics/ha-covers.jpeg)
+   ![Home Assistant covers](pics/ha-covers.jpg)
 
 6. Customize Cover Configuration:
 
