@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "name": "ESPHome ESP32-C6",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/.esphome/build/novo-bridge/src",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/**",
+        "${env:HOME}/.platformio/packages/toolchain-riscv32-esp/riscv32-esp-elf/include/**",
+        "${env:HOME}/.platformio/packages/toolchain-riscv32-esp/lib/gcc/riscv32-esp-elf/14.2.0/include"
+      ],
+      "defines": [
+        "ESP_PLATFORM",
+        "USE_ESP32",
+        "USE_ESP32_FRAMEWORK_ESP_IDF",
+        "USE_ESP32_VARIANT_ESP32C6"
+      ],
+      "compilerPath": "${env:HOME}/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-gcc",
+      "cStandard": "gnu17",
+      "cppStandard": "gnu++20",
+      "intelliSenseMode": "gcc-x64"
+    }
+  ],
+  "version": 4
+}

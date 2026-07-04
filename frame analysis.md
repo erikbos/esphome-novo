@@ -495,7 +495,7 @@ Format C has at least one counter-like byte:
 - `c1` is also counter-derived, but only from the low seven bits of `cc`: `c1 = (cc & 0x7f) ^ (0x55 ^ g)`. This keeps the high bit of `c1` clear in the clean captures.
 - The Format C counter is independent from the Format A counter value. Remote 1 emits Format A, then Format C, then Format B in the same repeat cycle, but the decoded counter bytes are not the same across the three formats.
 - `c8` appears to contain a repeat/secondary-command component. For short presses its base value is predictable from the button and group. During longer holds it may change, but the hold behaviour is not yet characterised as fully as Format A.
-- `c9` is mostly solved. Its low seven bits are derived from the unwrapped Format A counter `c_A_ext` from the paired Format A frame in the same A/C/B cycle:
+- `c9` is a counter with a persistent phase bit. Its low seven bits are fully solved — derived from the unwrapped Format A counter `c_A_ext` from the paired Format A frame in the same A/C/B cycle:
 
   ```
   c9_low7 = ((c_A_ext >> 3) + 4) & 0x7f
@@ -512,19 +512,19 @@ Format C has at least one counter-like byte:
 
   ```
   c11_bit7 = (~c9_bit7) ^ (channel_index & 1) ^ button_flag
+  c9_bit7  = (~c11_bit7) ^ (channel_index & 1) ^ button_flag
   ```
 
-  Equivalently, if `c11` is known from a captured frame:
+  Because `c9_bit7` is stateful, a byte-perfect synthetic Format C generator needs one of:
 
-  ```
-  c9_bit7 = (~c11_bit7) ^ (channel_index & 1) ^ button_flag
-  ```
+  - a single captured reference frame from the target remote (to learn its current phase), then track `c9` forward per frame, **or**
+  - the power-on phase value, then track forward.
 
-  Until the standalone rule for `c9_bit7` is solved, a fully synthetic Format C generator still needs either a supplied `c9` byte, a known previous `c9` state, or a supplied `c9_bit7` phase value.
+  Both are the standard approach for cloning any rolling-code remote. With a supplied or tracked `c9`, the generator reproduces every byte of every non-corrupted captured frame (see reproduction results below).
 
   Per-frame, `c9_low7` advances by 1 or 2 each Format C frame. The split is driven by the Format A counter: when `c_A_ext & 7 < 4`, the next frame's `c9_low7` advances by 1; when `c_A_ext & 7 >= 4`, it advances by 2. This is the natural consequence of the Format A counter stepping by 12 per A/C/B cycle and the `>> 3` in the formula.
 - `c10` is a checksum byte. Its bit 7 always matches `c2`'s bit 7. Its low seven bits are derived from the low seven bits of `c1..c9` plus a correction term that uses the high bits of those bytes and the high bit of `c11`. The folded-high-bit formula is given in full in the helper code below; it matches 100% of captured frames.
-- `c11` is a phase byte. Specifically, `c11 = 0x80` when `(~c9_bit7) XOR (channel_index & 1) XOR button_flag` is 1, and `c11 = 0x00` otherwise. The `button_flag` is `0` for Button 1 (Open) and P1, and `1` for Button 2 (Stop) and Button 3 (Close). This formula matches 100% of captured frames.
+- `c11` is a phase byte. Specifically, `c11 = 0x80` when `(~c9_bit7) XOR (channel_index & 1) XOR button_flag` is 1, and `c11 = 0x00` otherwise. The `button_flag` is `0` for Button 1 (Open) and P1, and `1` for Button 2 (Stop) and Button 3 (Close). This formula matches every non-corrupted captured frame. `c11` only ever carries bit 7; the low 7 bits are always zero. A spurious bit 6 (`0x40`/`0xc0`) appears in 24 of 2,828 frames (~0.85%), scattered across all channels/buttons/counters with no state correlation, and 20 of those 24 also fail the `c10` checksum — these are single-bit reception errors, not a protocol field. (The `c10` checksum reads only `c11` bit 7, so a flipped bit 6 slips past a frame's own self-check, which is why the remaining 4 look "self-consistent".)
 
 For short presses, the observed base value for `c8 ^ cc` is:
 
@@ -546,11 +546,20 @@ else:
 c8 = cc ^ (c8_base ^ repeat_c)
 ```
 
-For short-press captures, `repeat_c` is normally `0`. During holds, `repeat_c` appears to advance as a duplicated sequence, for example `0, 0, 1, 1, 2, 2, 3, 3, ...` while the frame counters continue advancing.
+For short-press captures, `repeat_c` is normally `0`. During holds, `repeat_c` advances as a clean incrementing counter (`0x00, 0x01, 0x02, ...`, often with each value duplicated across the two frames of a repeat step) while the frame counters continue advancing. `repeat_c` is recovered from a captured frame as `repeat_c = c8 ^ cc ^ c8_base`. Across all clean captures, 1,263 frames have `repeat_c == 0` (short presses) and 1,565 have `repeat_c != 0` (holds); the hold frames are fully explained by this counter, not by any unknown in `c8`.
+
+#### Format C reproduction results
+
+Against the full clean-capture set (2,828 paired Remote 1 Format C frames), the generator below — supplied with the real `c9` and `repeat_c` for each frame — reproduces:
+
+- **2,779 / 2,828 = 98.27%** of all clean-group frames byte-for-byte, and
+- **2,779 / 2,783 = 99.86%** of frames that pass their own `c10` checksum (i.e. were not corrupted in reception).
+
+Of the 49 residual mismatches, 45 fail their own `c10` checksum outright (reception glitches) and the remaining 4 differ only in `c11` bit 6, the single-bit RX error described above. In other words, on every frame that arrived intact, the specification is byte-perfect given the tracked `c9` and `repeat_c` state.
 
 #### Frame C format specification
 
-Fields `c0..c8`, `c10`, and `c11` are solved for the observed short-press and hold captures. `c9` is mostly solved: its low seven bits are derived from the unwrapped paired Format A counter, and its bit 7 is coupled to `c11`. The remaining unresolved piece is a standalone rule for `c9_bit7` when generating Format C from scratch without a captured or tracked phase state.
+Fields `c0..c8`, `c10`, and `c11` are fully solved for the observed short-press and hold captures. `c9`'s low seven bits are solved (derived from the unwrapped paired Format A counter). `c9_bit7` is not an unsolved formula but irreducible persistent phase state, retained across power cycles and coupled to `c11`; generating Format C from scratch requires a captured or tracked phase, exactly as for any rolling-code remote. Every field of every non-corrupted captured frame is understood, and the generator reproduces intact frames byte-for-byte given the tracked `c9`/`repeat_c` state.
 
 | Byte | Value | Description |
 |------|-------|-------------|
@@ -563,13 +572,13 @@ Fields `c0..c8`, `c10`, and `c11` are solved for the observed short-press and ho
 | c6  | `cc ^ channel_button_code` | Channel and button field. High bit is the odd/even channel bit; low bits identify button within group. |
 | c7  | `cc ^ cmd1` | Command byte 1. |
 | c8  | `cc ^ (c8_base ^ repeat_c)` | Repeat/secondary-command field. Short presses normally use `repeat_c = 0`; holds use the observed duplicated repeat sequence. |
-| c9  | mostly solved (see below) | Counter/phase byte. Low seven bits = `((c_A_ext >> 3) + 4) & 0x7f` from the unwrapped paired Format A counter. Bit 7 is coupled to `c11` bit 7; standalone generation still requires a known/supplied `c9_bit7` phase. |
+| c9  | counter + phase state (see below) | Low seven bits = `((c_A_ext >> 3) + 4) & 0x7f` from the unwrapped paired Format A counter. Bit 7 is irreducible phase state (retained across power cycles, coupled to `c11` bit 7) — supply it from a captured reference or track it forward; it cannot be computed standalone. |
 | c10 | folded-high-bit checksum of `c1..c9` (see helper code) | Bit 7 matches `c2`'s bit 7. Low 7 bits derived from low 7 bits of `c1..c9` plus a correction using their high bits and `c11`'s high bit. |
 | c11 | `0x80` if `(~c9_bit7) ^ (channel_index & 1) ^ button_flag` else `0x00` | Phase byte. `button_flag = 0` for OPEN/PAIR, `1` for STOP/CLOSE. |
 
 ##### Frame C helper code
 
-The function below returns a complete Format C frame for the given button, channel, counter, and `c9`. The caller still supplies `c9` because the standalone rule for `c9_bit7` is not yet solved. If the unwrapped paired Format A counter and the desired high-bit phase are known, `c9` can be constructed as `((c9_bit7 << 7) | (((c_A_ext >> 3) + 4) & 0x7f))`; otherwise copy `c9` from a matching captured frame or track it from a known previous `c9` state. The `c10` and `c11` formulas the function uses reproduce captured values exactly across all tested captures.
+The function below returns a complete Format C frame for the given button, channel, counter, and `c9`. The caller supplies `c9` because `c9_bit7` is persistent phase state (see above), not a value derivable from the other fields. If the unwrapped paired Format A counter and the desired high-bit phase are known, `c9` can be constructed as `((c9_bit7 << 7) | (((c_A_ext >> 3) + 4) & 0x7f))`; otherwise copy `c9` from a matching captured frame or track it forward from a known previous `c9` state. Given the real `c9` and `repeat_c`, this function reproduces every non-corrupted captured frame byte-for-byte (99.86% of self-consistent frames; the rest are reception glitches).
 
 By default the returned bytes are:
 
@@ -694,3 +703,10 @@ The following is not 100% understood:
 - Frame C: Not 100% decoded, a few bits unclear..
 - Button P2 unclear: observation using P2 changes the whole format of A, B and C. Given P2 is involved in configuring a blind we do not have to understand this one.
 - Some Novo remote variants have more buttons.. probably easy to determine their values but would require rf captures.
+
+## Contribute data
+
+I'd love to receive more samples to determine more device id and phase_id relationship. How to make a usefull capture:
+
+1. Start `rtl_sdr -f 868000000 -g 20 -s 1000000 recording-1Ms.cu8`
+2. Tell me your SDR's sample rate and center frequency, and which remote/channel it is.

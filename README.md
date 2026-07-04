@@ -85,8 +85,8 @@ The code assumes the following pinmapping:
 
    The `novo-bridge.yaml` file includes two pre-configured cover entities as examples:
 
-   - Blind Channel 1, Uses Remote 1, Channel 1
-   - Blind Channel 2, Uses Remote 1, Channel 2
+   - Blind Channel 1, Uses Remote 3, Channel 1
+   - Blind Channel 2, Uses Remote 3, Channel 2
 
    Recommendation: Customize these covers to match your setup by editing the YAML file:
    - Update the remote and channel assignments based on your pairing

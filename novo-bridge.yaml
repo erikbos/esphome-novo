@@ -3,18 +3,32 @@ esphome:
   friendly_name: "Bridge"
   includes:
     - cc1101_radio.h
-  on_boot:
-    priority: 600
-    then:
-      - lambda: |-
-          cc1101_configure_novo();
-          ESP_LOGI("novo_boot", "%s", cc1101_probe_string().c_str());
 
 esp32:
   board: esp32-c6-devkitc-1
   variant: esp32c6
   framework:
     type: esp-idf
+
+# SPI bus for the CC1101 radio
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+  miso_pin: GPIO2
+
+# Native CC1101 radio bring-up: RF/modem parameters only.
+# The Novo packet framing (sync word, preamble, packet length, CRC, whitening, packet mode)
+# is configured from C++ in cc1101_radio.h, not here.
+cc1101:
+  id: radio
+  cs_pin: GPIO18
+  gdo0_pin: GPIO15
+  frequency: 868.0MHz
+  modulation_type: 2-FSK
+  symbol_rate: 9600
+  fsk_deviation: 50kHz
+  filter_bandwidth: 101kHz
+  output_power: 11
 
 logger:
   level: INFO
@@ -100,21 +114,21 @@ cover:
 
     open_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(1);  // Channel 1
-          novo_close();                // reversed direction
+          novo_open(id(radio));
 
     close_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(1);  // Channel 1
-          novo_open();                 // reversed direction
+          novo_close(id(radio));
 
     stop_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(1);  // Channel 1
-          novo_stop();
+          novo_stop(id(radio));
 
   - platform: template
     name: "Blind Channel 2"
@@ -124,21 +138,21 @@ cover:
 
     open_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(2);  // Channel 2
-          novo_close();                // reversed direction
+          novo_open(id(radio));
 
     close_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(2);  // Channel 2
-          novo_open();                 // reversed direction
+          novo_close(id(radio));
 
     stop_action:
       - lambda: |-
-          novo_set_remote(0);          // Remote 1
+          novo_set_remote(2);          // Remote 3
           novo_set_channel_number(2);  // Channel 2
-          novo_stop();
+          novo_stop(id(radio));
 
 button:
   - platform: restart
@@ -148,34 +162,34 @@ button:
     name: "Open"
     on_press:
       - lambda: |-
-          novo_open();
+          novo_open(id(radio));
 
   - platform: template
     name: "Stop"
     on_press:
       - lambda: |-
-          novo_stop();
+          novo_stop(id(radio));
 
   - platform: template
     name: "Close"
     on_press:
       - lambda: |-
-          novo_close();
+          novo_close(id(radio));
 
   - platform: template
     name: "Pair"
     on_press:
       - lambda: |-
-          novo_pair();
+          novo_pair(id(radio));
 
 sensor:
   - platform: wifi_signal
     name: "WiFi Signal"
-    update_interval: 30s
+    update_interval: 60s
 
   - platform: uptime
     name: "Uptime"
-    update_interval: 30s
+    update_interval: 60s
 
 text_sensor:
   - platform: version
@@ -188,15 +202,3 @@ text_sensor:
       name: "Connected SSID"
     mac_address:
       name: "MAC Address"
-
-  - platform: template
-    name: "CC1101 Probe Result"
-    update_interval: 10s
-    lambda: |-
-      return cc1101_probe_string();
-
-  - platform: template
-    name: "Status"
-    update_interval: 5s
-    lambda: |-
-      return novo_status_string();
