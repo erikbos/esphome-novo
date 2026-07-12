@@ -191,6 +191,10 @@ sensor:
     name: "Uptime"
     update_interval: 60s
 
+  - platform: internal_temperature
+    name: "ESP32 Internal Temperature"
+    update_interval: 60s
+
 text_sensor:
   - platform: version
     name: "ESPHome Version"
